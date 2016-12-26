@@ -8,11 +8,10 @@
  * Corresponding MQTT/Serial/Console commands in [brackets]
 \*********************************************************************************************/
 
-// Enable only one out of five MODULE defines below
+// Enable only one out of four MODULE defines below
 #define MODULE                 SONOFF            // Sonoff Basic, Sonoff RF, Sonoff SV, Sonoff Dual, Sonoff TH, S20 Smart Socket
 //#define MODULE                 SONOFF_2          // Sonoff Touch, Sonoff 4CH
 //#define MODULE                 SONOFF_POW        // Sonoff Pow
-//#define MODULE                 MOTOR_CAC         // iTead Motor Clockwise/Anticlockwise
 //#define MODULE                 ELECTRO_DRAGON    // Electro Dragon Wifi IoT Relay Board Based on ESP8266
 
 // -- Project --------------------------------
@@ -24,10 +23,10 @@
 #define SAVE_STATE             1            // [SaveState] Save changed power state to Flash (0 = disable, 1 = enable)
 
 // -- Wifi -----------------------------------
-#define STA_SSID1              "indebuurt1"      // [Ssid1] Wifi SSID
-#define STA_PASS1              "VnsqrtnrsddbrN"  // [Password1] Wifi password
-#define STA_SSID2              "indebuurt2"      // [Ssid2] Optional alternate AP Wifi SSID
-#define STA_PASS2              "VnsqrtnrsddbrN"  // [Password2] Optional alternate AP Wifi password
+#define STA_SSID1              "CASTLEGRIFFIN"      // [Ssid1] Wifi SSID
+#define STA_PASS1              "Tekka1Katie2"  // [Password1] Wifi password
+#define STA_SSID2              "COTTAGE_GRIFFIN_5G"      // [Ssid2] Optional alternate AP Wifi SSID
+#define STA_PASS2              "Tekka1Katie2"  // [Password2] Optional alternate AP Wifi password
 #define WIFI_HOSTNAME          "%s-%04d"         // [Hostname] Expands to <MQTT_TOPIC>-<last 4 decimal chars of MAC address>
 #define WIFI_CONFIG_TOOL       WIFI_WPSCONFIG    // [WifiConfig] Default tool if wifi fails to connect
                                                  //   (WIFI_RESTART, WIFI_SMARTCONFIG, WIFI_MANAGER, WIFI_WPSCONFIG, WIFI_RETRY)
@@ -50,16 +49,16 @@
 //#define USE_MQTT_TLS                        // EXPERIMENTAL Use TLS for MQTT connection (+53k code, +20k mem)
                                             //   Needs Fingerprint, TLS Port, UserId and Password
 #ifdef USE_MQTT_TLS
-  #define MQTT_HOST            "m20.cloudmqtt.com"  // [MqttHost]
+  #define MQTT_HOST            "192.168.0.195"  // [MqttHost]
   #define MQTT_FINGERPRINT     "A5 02 FF 13 99 9F 8B 39 8E F1 83 4F 11 23 65 0B 32 36 FC 07"  // [MqttFingerprint]
   #define MQTT_PORT            20123                // [MqttPort] MQTT TLS port
-  #define MQTT_USER            "cloudmqttuser"      // [MqttUser] Mandatory user
-  #define MQTT_PASS            "cloudmqttpassword"  // [MqttPassword] Mandatory password
+  #define MQTT_USER            "ggriffin"      // [MqttUser] Mandatory user
+  #define MQTT_PASS            "sybore11"  // [MqttPassword] Mandatory password
 #else
-  #define MQTT_HOST            "domus1"     // [MqttHost]
+  #define MQTT_HOST            "192.168.0.195"     // [MqttHost]
   #define MQTT_PORT            1883         // [MqttPort] MQTT port (10123 on CloudMQTT)
-  #define MQTT_USER            "DVES_USER"  // [MqttUser] Optional user
-  #define MQTT_PASS            "DVES_PASS"  // [MqttPassword] Optional password
+  #define MQTT_USER            "ggriffin"  // [MqttUser] Optional user
+  #define MQTT_PASS            "sybore11"  // [MqttPassword] Optional password
 #endif
 
 #define MQTT_CLIENT_ID         "DVES_%06X"  // [MqttClient] Also fall back topic using Chip Id = last 6 characters of MAC address
@@ -244,21 +243,6 @@
   #define SEND_TELEMETRY_ENERGY             // Enable sending energy telemetry
 
 /*********************************************************************************************\
- * Motor Clockwise/Anticlockwise
- * 
- * >>> Select Board "Generic ESP8266 Module" and Flash Size "1M (64K SPIFFS)" <<<
-\*********************************************************************************************/
-
-#elif MODULE == MOTOR_CAC                   // programming pins 6:3.3V 7:rx 8:tx 9:gnd of PSA-B
-  #define APP_NAME             "Motor C/AC module"
-  #define MQTT_GRPTOPIC        "motors"     // [GroupTopic] MQTT Group topic
-/*-------------------------------------------------------------------------------------------*/
-  #define LED_PIN              13           // GPIO 13 = Green/Blue Led (0 = On, 1 = Off) - Sonoff
-  #define LED_INVERTED         1            // 0 = (1 = On, 0 = Off), 1 = (0 = On, 1 = Off)
-  #define REL_PIN              12           // GPIO 12 = Red Leds and Relays (0 = Off, 1 = On)
-  #define KEY_PIN              0            // GPIO 00 = Button
-
-/*********************************************************************************************\
  * Electrodragon
  * 
  * >>> Select Board "Generic ESP8266 Module" and Flash Size "1M (64K SPIFFS)" or "4M (1M SPIFFS)" <<<
@@ -309,7 +293,7 @@
 \*********************************************************************************************/
 
 #else
-  #error "Select either module SONOFF, SONOFF_85, SONOFF_POW, MOTOR_CAC or ELECTRO_DRAGON"
+  #error "Select either module SONOFF, SONOFF_85, SONOFF_POW or ELECTRO_DRAGON"
 #endif
 
 #if defined(SEND_TELEMETRY_DS18B20) && defined(SEND_TELEMETRY_DS18x20)
