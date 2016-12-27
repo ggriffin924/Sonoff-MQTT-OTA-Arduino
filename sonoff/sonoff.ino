@@ -17,6 +17,7 @@
 #define SONOFF_2               10           // Sonoff Touch, Sonoff 4CH
 #define MOTOR_CAC              11           // iTead Motor Clockwise/Anticlockwise
 #define ELECTRO_DRAGON         12           // Electro Dragon Wifi IoT Relay Board Based on ESP8266
+#define NODEMCU_RELAY          14           // NodeMCU board with relay's
 
 #define DHT11                  11
 #define DHT21                  21

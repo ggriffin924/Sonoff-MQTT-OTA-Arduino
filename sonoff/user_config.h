@@ -13,6 +13,7 @@
 //#define MODULE                 SONOFF_2          // Sonoff Touch, Sonoff 4CH
 //#define MODULE                 SONOFF_POW        // Sonoff Pow
 //#define MODULE                 ELECTRO_DRAGON    // Electro Dragon Wifi IoT Relay Board Based on ESP8266
+// #define MODULE                 NODEMCU_RELAY     // ESP8266 based NodeMCU board with relay's.
 
 // -- Project --------------------------------
 #define PROJECT                "sonoff"     // PROJECT is used as the default topic delimiter and OTA file name
