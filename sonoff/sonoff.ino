@@ -10,7 +10,7 @@
  * ====================================================
 */
 
-#define VERSION                0x03010300   // 3.1.3
+#define VERSION                0x03010800   // 3.1.8
 
 #define SONOFF                 1            // Sonoff, Sonoff RF, Sonoff SV, Sonoff Dual, Sonoff TH, S20 Smart Socket, 4 Channel
 #define SONOFF_POW             9            // Sonoff Pow
@@ -284,6 +284,8 @@ struct SYSCFG {
 
   uint16_t      pulsetime;
   uint8_t       poweronstate;
+  uint16_t      blinktime;
+  uint16_t      blinkcount;
 
 } sysCfg;
 
@@ -337,6 +339,11 @@ byte logidx = 0;                      // Index in Web log buffer
 byte Maxdevice = MAX_DEVICE;          // Max number of devices supported
 int status_update_timer = 0;          // Refresh initial status
 uint16_t pulse_timer = 0;             // Power off timer
+uint16_t blink_timer = 0;             // Power cycle timer
+uint16_t blink_counter = 0;           // Number of blink cycles
+uint8_t blink_power;                  // Blink power state
+uint8_t blink_mask = 0;               // Blink relay active mask
+uint8_t blink_powersave;              // Blink start power save state
 
 #ifdef USE_MQTT_TLS
   WiFiClientSecure espClient;         // Wifi Secure Client
@@ -448,6 +455,8 @@ void CFG_DefaultSet()
   sysCfg.pulsetime = APP_PULSETIME;
   sysCfg.ledstate = APP_LEDSTATE;
   sysCfg.switchmode = SWITCH_MODE;
+  sysCfg.blinktime = APP_BLINKTIME;
+  sysCfg.blinkcount = APP_BLINKCOUNT;
 
   strlcpy(sysCfg.domoticz_in_topic, DOMOTICZ_IN_TOPIC, sizeof(sysCfg.domoticz_in_topic));
   strlcpy(sysCfg.domoticz_out_topic, DOMOTICZ_OUT_TOPIC, sizeof(sysCfg.domoticz_out_topic));
@@ -613,6 +622,10 @@ void CFG_Delta()
     if (sysCfg.version < 0x03010200) {  // 3.1.2 - Add parameter
       if (sysCfg.poweronstate == 2) sysCfg.poweronstate = 3;
     }
+    if (sysCfg.version < 0x03010600) {  // 3.1.6 - Add parameter
+      sysCfg.blinktime = APP_BLINKTIME;
+      sysCfg.blinkcount = APP_BLINKCOUNT;
+    }
 
     sysCfg.version = VERSION;
   }
@@ -770,13 +783,26 @@ void mqtt_publishPowerState(byte device)
   char stopic[TOPSZ], svalue[MESSZ], sdevice[10];
 
   if ((device < 1) || (device > Maxdevice)) device = 1;
-  snprintf_P(stopic, sizeof(stopic), PSTR("%s/%s/RESULT"), PUB_PREFIX, sysCfg.mqtt_topic);
   snprintf_P(sdevice, sizeof(sdevice), PSTR("%d"), device);
+  snprintf_P(stopic, sizeof(stopic), PSTR("%s/%s/RESULT"), PUB_PREFIX, sysCfg.mqtt_topic);
   snprintf_P(svalue, sizeof(svalue), PSTR("{\"%s%s\":\"%s\"}"),
     sysCfg.mqtt_subtopic, (Maxdevice > 1) ? sdevice : "", (power & (0x01 << (device -1))) ? MQTT_STATUS_ON : MQTT_STATUS_OFF);
   if (sysCfg.message_format == JSON) mqtt_publish(stopic, svalue);
   json2legacy(stopic, svalue);
   mqtt_publish(stopic, svalue, sysCfg.mqtt_power_retain);
+}
+
+void mqtt_publishPowerBlinkState(byte device)
+{
+  char stopic[TOPSZ], svalue[MESSZ], sdevice[10];
+
+  if ((device < 1) || (device > Maxdevice)) device = 1;
+  snprintf_P(sdevice, sizeof(sdevice), PSTR("%d"), device);
+  snprintf_P(stopic, sizeof(stopic), PSTR("%s/%s/RESULT"), PUB_PREFIX, sysCfg.mqtt_topic);
+  snprintf_P(svalue, sizeof(svalue), PSTR("{\"%s%s\":\"BLINK %s\"}"),
+    sysCfg.mqtt_subtopic, (Maxdevice > 1) ? sdevice : "", (blink_mask & (0x01 << (device -1))) ? MQTT_STATUS_ON : MQTT_STATUS_OFF);
+  if (sysCfg.message_format != JSON) json2legacy(stopic, svalue);
+  mqtt_publish(stopic, svalue);
 }
 
 #ifdef USE_DOMOTICZ
@@ -891,16 +917,13 @@ void mqtt_reconnect()
   }
 
   addLog_P(LOG_LEVEL_INFO, PSTR("MQTT: Attempting connection..."));
-  if (sysCfg.message_format == JSON) {
-    snprintf_P(stopic, sizeof(stopic), PSTR("%s/%s/TELEMETRY"), PUB_PREFIX2, sysCfg.mqtt_topic);
-    snprintf_P(svalue, sizeof(svalue), PSTR("{\"LWT\":\"Offline\"}"));
-  } else {
-    snprintf_P(stopic, sizeof(stopic), PSTR("%s/%s/LWT"), PUB_PREFIX2, sysCfg.mqtt_topic);
-    snprintf_P(svalue, sizeof(svalue), PSTR("Offline"));
-  }
-  if (mqttClient.connect(MQTTClient, sysCfg.mqtt_user, sysCfg.mqtt_pwd, stopic, 0, 0, svalue)) {
+  snprintf_P(stopic, sizeof(stopic), PSTR("%s/%s/LWT"), PUB_PREFIX2, sysCfg.mqtt_topic);
+  snprintf_P(svalue, sizeof(svalue), PSTR("Offline"));
+  if (mqttClient.connect(MQTTClient, sysCfg.mqtt_user, sysCfg.mqtt_pwd, stopic, 1, true, svalue)) {
     addLog_P(LOG_LEVEL_INFO, PSTR("MQTT: Connected"));
     mqttcounter = 0;
+    snprintf_P(svalue, sizeof(svalue), PSTR("Online"));
+    mqtt_publish(stopic, svalue, true);
     udpConnected = false;
     mqtt_connected();
   } else {
@@ -1006,8 +1029,8 @@ void mqttDataCb(char* topic, byte* data, unsigned int data_len)
     mtopic, grpflg, index, type, dataBuf, dataBufUc);
   addLog(LOG_LEVEL_DEBUG, svalue);
 
+  snprintf_P(stopic, sizeof(stopic), PSTR("%s/%s/RESULT"), PUB_PREFIX, sysCfg.mqtt_topic);
   if (type != NULL) {
-    snprintf_P(stopic, sizeof(stopic), PSTR("%s/%s/RESULT"), PUB_PREFIX, sysCfg.mqtt_topic);
     snprintf_P(svalue, sizeof(svalue), PSTR("{\"Command\":\"Error\"}"));
     if (sysCfg.ledstate &0x02) blinks++;
 
@@ -1016,10 +1039,12 @@ void mqttDataCb(char* topic, byte* data, unsigned int data_len)
     if (!strcmp(dataBufUc,"OFF") || !strcmp(dataBufUc,"STOP")) payload = 0;
     if (!strcmp(dataBufUc,"ON") || !strcmp(dataBufUc,"START") || !strcmp(dataBufUc,"USER")) payload = 1;
     if (!strcmp(dataBufUc,"TOGGLE") || !strcmp(dataBufUc,"ADMIN")) payload = 2;
+    if (!strcmp(dataBufUc,"BLINK")) payload = 3;
+    if (!strcmp(dataBufUc,"BLINKOFF")) payload = 4;
 
     if ((!strcmp(type,"POWER") || !strcmp(type,"LIGHT")) && (index <= Maxdevice)) {
       snprintf_P(sysCfg.mqtt_subtopic, sizeof(sysCfg.mqtt_subtopic), PSTR("%s"), type);
-      if ((data_len == 0) || (payload > 2)) payload = 9;
+      if ((data_len == 0) || (payload > 4)) payload = 9;
       do_cmnd_power(index, payload);
       return;
     }
@@ -1149,6 +1174,20 @@ void mqttDataCb(char* topic, byte* data, unsigned int data_len)
         pulse_timer = 0;
       }
       snprintf_P(svalue, sizeof(svalue), PSTR("{\"PulseTime\":%d}"), sysCfg.pulsetime);
+    }
+    else if (!strcmp(type,"BLINKTIME")) {
+      if ((data_len > 0) && (payload > 2) && (payload <= 3600)) {
+        sysCfg.blinktime = payload;
+        if (blink_timer) blink_timer = sysCfg.blinktime;
+      }
+      snprintf_P(svalue, sizeof(svalue), PSTR("{\"BlinkTime\":%d}"), sysCfg.blinktime);
+    }
+    else if (!strcmp(type,"BLINKCOUNT")) {
+      if ((data_len > 0) && (payload >= 0) && (payload <= 32000)) {
+        sysCfg.blinkcount = payload;
+        if (blink_counter) blink_counter = sysCfg.blinkcount *2;
+      }
+      snprintf_P(svalue, sizeof(svalue), PSTR("{\"BlinkCount\":%d}"), sysCfg.blinkcount);
     }
     else if (!strcmp(type,"SAVEDATA")) {
       if ((data_len > 0) && (payload >= 0) && (payload <= 3600)) {
@@ -1691,11 +1730,17 @@ void do_cmnd_power(byte device, byte state)
 // state 0 = Relay Off
 // state 1 = Relay on (turn off after sysCfg.pulsetime * 100 mSec if enabled)
 // state 2 = Toggle relay
+// state 3 = Blink relay
+// state 4 = Stop blinking relay
 // state 9 = Show power state
 
   if ((device < 1) || (device > Maxdevice)) device = 1;
   byte mask = 0x01 << (device -1);
   if (state <= 2) {
+    if ((blink_mask & mask)) {
+      blink_mask &= (0xFF ^ mask);  // Clear device mask
+      mqtt_publishPowerBlinkState(device);
+    }
     switch (state) {
     case 0: { // Off
       power &= (0xFF ^ mask);
@@ -1713,7 +1758,39 @@ void do_cmnd_power(byte device, byte state)
 #endif  // USE_DOMOTICZ
     if (device == 1) pulse_timer = (power & mask) ? sysCfg.pulsetime : 0; 
   }
+  else if (state == 3) { // Blink
+    if (!(blink_mask & mask)) {
+      blink_powersave = (blink_powersave & (0xFF ^ mask)) | (power & mask);  // Save state
+      blink_power = (power & mask) ? 0 : 1;  // Toggle
+    }
+    blink_timer = 1;
+    blink_counter = ((!sysCfg.blinkcount) ? 64000 : (sysCfg.blinkcount *2)) +1;
+    blink_mask |= mask;  // Set device mask
+    mqtt_publishPowerBlinkState(device);
+    return;
+  }
+  else if (state == 4) { // No Blink
+    byte flag = (blink_mask & mask);
+    blink_mask &= (0xFF ^ mask);  // Clear device mask
+    mqtt_publishPowerBlinkState(device);
+    if (flag) do_cmnd_power(device, (blink_powersave >> (device -1))&1);  // Restore state
+    return;
+  }
   mqtt_publishPowerState(device);
+}
+
+void stop_all_power_blink()
+{
+  byte i, mask;
+
+  for (i = 1; i <= Maxdevice; i++) {
+    mask = 0x01 << (i -1);
+    if (blink_mask & mask) {
+      blink_mask &= (0xFF ^ mask);  // Clear device mask
+      mqtt_publishPowerBlinkState(i);
+      do_cmnd_power(i, (blink_powersave >> (i -1))&1);  // Restore state
+    }      
+  }
 }
 
 void do_cmnd(char *cmnd)
@@ -1723,8 +1800,10 @@ void do_cmnd(char *cmnd)
   char *token;
 
   token = strtok(cmnd, " ");
-  start = strrchr(token, '/');   // Skip possible cmnd/sonoff/ preamble
-  if (start) token = start;
+  if (token != NULL) {
+    start = strrchr(token, '/');   // Skip possible cmnd/sonoff/ preamble
+    if (start) token = start;
+  }
   snprintf_P(stopic, sizeof(stopic), PSTR("%s/%s/%s"), SUB_PREFIX, sysCfg.mqtt_topic, token);
   token = strtok(NULL, "");
   snprintf_P(svalue, sizeof(svalue), PSTR("%s"), (token == NULL) ? "" : token);
@@ -2222,8 +2301,8 @@ void every_second()
 
 void stateloop()
 {
-  uint8_t button, flag, switchflag;
-  char scmnd[20], log[LOGSZ], stopic[TOPSZ], svalue[TOPSZ];
+  uint8_t button, flag, switchflag, power_now;
+  char scmnd[20], log[LOGSZ], stopic[TOPSZ], svalue[MESSZ];
 
   timerxs = millis() + (1000 / STATES);
   state++;
@@ -2235,6 +2314,21 @@ void stateloop()
   if (pulse_timer) {
     pulse_timer--;
     if (!pulse_timer) do_cmnd_power(1, 0);
+  }
+
+  if (blink_mask) {
+    blink_timer--;
+    if (!blink_timer) {
+      blink_timer = sysCfg.blinktime;
+      blink_counter--;
+      if (!blink_counter) {
+        stop_all_power_blink();
+      } else {
+        blink_power ^= 1;
+        power_now = (power & (0xFF ^ blink_mask)) | ((blink_power) ? blink_mask : 0);
+        setRelay(power_now);
+      }
+    }
   }
 
   if ((sysCfg.model >= SONOFF_DUAL) && (sysCfg.model <= CHANNEL_4)) {
@@ -2627,6 +2721,7 @@ void setup()
     power = sysCfg.power & ((0x00FF << Maxdevice) >> 8);
     if (sysCfg.savestate) setRelay(power);
   }
+  blink_powersave = power;
 
 #ifdef USE_WALL_SWITCH
   pinMode(SWITCH_PIN, INPUT_PULLUP);            // set pin to input, fitted with external pull up on Sonoff TH10/16 board
