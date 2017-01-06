@@ -2,5 +2,7 @@
 .piolibdeps
 .clang_complete
 .gcc-flags.json
-sonoff/user_config.h
+myinstructions.txt
+# sonoff/user_config.h
+sonoff/myuser_config.h
 sonoff/sonoff.ino.generic.bin
