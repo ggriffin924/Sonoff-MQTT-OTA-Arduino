@@ -24,8 +24,8 @@
 #define SAVE_STATE             1            // [SaveState] Save changed power state to Flash (0 = disable, 1 = enable)
 
 // -- Wifi -----------------------------------
-#define STA_SSID1              "indebuurt1"      // [Ssid1] Wifi SSID
-#define STA_PASS1              "VnsqrtnrsddbrN"  // [Password1] Wifi password
+#define STA_SSID1              "CASTLEGRIFFIN"      // [Ssid1] Wifi SSID
+#define STA_PASS1              "Tekka1Katie2"  // [Password1] Wifi password
 #define STA_SSID2              "indebuurt2"      // [Ssid2] Optional alternate AP Wifi SSID
 #define STA_PASS2              "VnsqrtnrsddbrN"  // [Password2] Optional alternate AP Wifi password
 #define WIFI_HOSTNAME          "%s-%04d"         // [Hostname] Expands to <MQTT_TOPIC>-<last 4 decimal chars of MAC address>
@@ -40,7 +40,7 @@
 
 // -- Ota ------------------------------------
 #if (ARDUINO >= 168)
-  #define OTA_URL              "http://domus1:80/api/arduino/" PROJECT ".ino.bin"  // [OtaUrl]
+  #define OTA_URL              "http://192.168.0.195:80/api/arduino/" PROJECT ".ino.bin"  // [OtaUrl]
 #else
   #define OTA_URL              "http://domus1:80/api/arduino/" PROJECT ".cpp.bin"  // [OtaUrl]
 #endif
@@ -56,10 +56,10 @@
   #define MQTT_USER            "cloudmqttuser"      // [MqttUser] Mandatory user
   #define MQTT_PASS            "cloudmqttpassword"  // [MqttPassword] Mandatory password
 #else
-  #define MQTT_HOST            "domus1"     // [MqttHost]
+  #define MQTT_HOST            "192.168.0.195"     // [MqttHost]
   #define MQTT_PORT            1883         // [MqttPort] MQTT port (10123 on CloudMQTT)
-  #define MQTT_USER            "DVES_USER"  // [MqttUser] Optional user
-  #define MQTT_PASS            "DVES_PASS"  // [MqttPassword] Optional password
+  #define MQTT_USER            "ggriffin"  // [MqttUser] Optional user
+  #define MQTT_PASS            "sybore11"  // [MqttPassword] Optional password
 #endif
 
 #define MQTT_CLIENT_ID         "DVES_%06X"  // [MqttClient] Also fall back topic using Chip Id = last 6 characters of MAC address
@@ -149,7 +149,7 @@
 \*-------------------------------------------------------------------------------------------*/
   #define SWITCH_PIN           14           // GPIO 14 = Standard wall switch to Gnd (Sonoff_TH10A(16A), Sonoff SV)
   #define SWITCH_MODE          TOGGLE       // [SwitchMode] TOGGLE, FOLLOW, FOLLOW_INV, PUSHBUTTON or PUSHBUTTON_INV (the wall switch state)
-//  #define USE_WALL_SWITCH                   // Enable the use of a standard wall switch to control the relay
+  #define USE_WALL_SWITCH                   // Enable the use of a standard wall switch to control the relay
 /*-------------------------------------------------------------------------------------------*\
  * Single wire devices DS18B20 and DS18S20
 \*-------------------------------------------------------------------------------------------*/
